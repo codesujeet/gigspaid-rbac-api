@@ -4,6 +4,25 @@ A small, security-focused REST API with **admin**, **editor** and **viewer** rol
 
 > Storage is **in-memory** (see [Known limitations](#known-limitations)). This is a reference implementation of the access-control layer, not a production datastore.
 
+## Quick start
+
+```bash
+npm ci
+cp .env.example .env     # PowerShell: Copy-Item .env.example .env
+npm run dev              # http://localhost:3000, demo users are seeded on startup
+```
+
+```bash
+# log in as the viewer, then try a forbidden action (expect 403)
+TOKEN=$(curl -s -X POST http://localhost:3000/auth/login -H 'Content-Type: application/json' \
+  -d '{"email":"viewer@example.com","password":"Viewer#12345"}' | node -pe "JSON.parse(require('fs').readFileSync(0,'utf8')).token")
+curl -i -X DELETE http://localhost:3000/articles/any-id -H "Authorization: Bearer $TOKEN"   # HTTP/1.1 403 Forbidden
+```
+
+Run the tests with `npm test`. More detail in [Setup and run](#setup-and-run) and [Try it with curl](#try-it-with-curl).
+
+**Contents:** [Requirements checklist](#requirements-checklist) · [Roles and permissions](#roles-and-permissions) · [Routes](#routes) · [Seed users](#seed-users) · [Project structure](#project-structure) · [Setup and run](#setup-and-run) · [Tests](#tests) · [Design notes](#design-notes) · [Known limitations](#known-limitations)
+
 ## Requirements checklist
 
 | # | Requirement | Where it is implemented | How to verify |
@@ -61,6 +80,25 @@ Created on server startup (and verified by `npm run seed`) when `SEED_DEMO_USERS
 | viewer | `viewer@example.com` | `Viewer#12345` |
 
 A sample article ("Welcome") is also seeded. Passwords are stored as bcrypt hashes.
+
+## Project structure
+
+```text
+src/
+  app.ts                 builds the Express app (no listen), so tests import it directly
+  server.ts              entry point: config check, seeding, listen
+  config.ts              environment parsing and validation (JWT secret rules, TTL, proxy hops)
+  rbac.ts                roles, permissions, ROLE_PERMISSIONS map (single source of truth)
+  seed.ts, seed-cli.ts   demo users for each role (startup seeding and `npm run seed`)
+  errors.ts              typed HTTP errors and the JSON error shape
+  middleware/
+    auth.ts              authenticate, requirePermission, requireRole
+    validate.ts          zod request validation
+    errorHandler.ts      consistent error responses, no stack traces
+  routes/                auth.ts (login), articles.ts (CRUD), users.ts (admin only)
+  store/index.ts         in-memory users and articles, last-admin protection
+tests/                   vitest + supertest: role x route matrix, 401 cases, escalation, validation
+```
 
 ## Setup and run
 
