@@ -10,7 +10,8 @@ import type { Store } from '../store';
 
 const loginSchema = z.strictObject({
   email: z.string().trim().email().max(254),
-  password: z.string().min(1).max(200),
+  // bcrypt ignores everything past 72 bytes, so longer inputs are rejected rather than silently truncated.
+  password: z.string().min(1).refine((p) => Buffer.byteLength(p) <= 72, 'Password must be at most 72 bytes'),
 });
 
 /** Public routes (no authentication). Mounted BEFORE the authenticate gate. */

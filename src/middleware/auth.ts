@@ -6,6 +6,7 @@ import { hasPermission, isRole, type Permission, type Role } from '../rbac';
 import type { Store } from '../store';
 
 export const JWT_ISSUER = 'gigspaid-rbac-api';
+export const JWT_AUDIENCE = 'gigspaid-rbac-api-clients';
 
 export interface AuthUser {
   id: string;
@@ -27,6 +28,7 @@ export function signToken(config: Pick<Config, 'jwtSecret' | 'jwtExpiresIn'>, us
     algorithm: 'HS256',
     subject: user.id,
     issuer: JWT_ISSUER,
+    audience: JWT_AUDIENCE,
     expiresIn: config.jwtExpiresIn as jwt.SignOptions['expiresIn'],
   });
 }
@@ -50,6 +52,7 @@ export function createAuthenticate(config: Pick<Config, 'jwtSecret'>, store: Sto
       const decoded = jwt.verify(match[1], config.jwtSecret, {
         algorithms: ['HS256'], // pins the algorithm: rejects "none" and algorithm confusion
         issuer: JWT_ISSUER,
+        audience: JWT_AUDIENCE,
       });
       if (typeof decoded === 'string') return next(unauthorized('Invalid token'));
       payload = decoded;

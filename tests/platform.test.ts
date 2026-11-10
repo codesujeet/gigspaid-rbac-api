@@ -6,7 +6,7 @@ import { Store } from '../src/store';
 import { bearer, buildCtx, type Ctx } from './helpers';
 
 describe('config', () => {
-  const secret = 'x'.repeat(32);
+  const secret = 'Q7vLm2Xp9RtK4wZ8aBn3Yc6Hd1Fs5GjU';
 
   it('refuses to start in production without JWT_SECRET', () => {
     expect(() => loadConfig({ NODE_ENV: 'production' })).toThrow(/JWT_SECRET/);
@@ -22,6 +22,20 @@ describe('config', () => {
     expect(c.jwtSecret).toBe(secret);
     expect(c.seedDemoUsers).toBe(false);
     expect(loadConfig({ NODE_ENV: 'production', JWT_SECRET: secret, SEED_DEMO_USERS: 'true' }).seedDemoUsers).toBe(true);
+  });
+
+  it('refuses placeholder / repetitive production secrets', () => {
+    expect(() => loadConfig({ NODE_ENV: 'production', JWT_SECRET: 'x'.repeat(40) })).toThrow(/placeholder|repetitive/);
+    expect(() => loadConfig({ NODE_ENV: 'production', JWT_SECRET: 'please-change-me-to-something-long-1234567' })).toThrow(/placeholder|repetitive/);
+  });
+
+  it('validates JWT_EXPIRES_IN and TRUST_PROXY_HOPS', () => {
+    for (const bad of ['0', '0h', 'forever', '-5m', '1y']) {
+      expect(() => loadConfig({ JWT_EXPIRES_IN: bad })).toThrow(/JWT_EXPIRES_IN/);
+    }
+    expect(loadConfig({ JWT_EXPIRES_IN: '15m' }).jwtExpiresIn).toBe('15m');
+    expect(() => loadConfig({ TRUST_PROXY_HOPS: '-1' })).toThrow(/TRUST_PROXY_HOPS/);
+    expect(loadConfig({ TRUST_PROXY_HOPS: '1' }).trustProxyHops).toBe(1);
   });
 
   it('dev without a secret gets a random ephemeral one (different each time)', () => {
@@ -80,6 +94,13 @@ describe('HTTP hygiene', () => {
     expect(res.headers['x-content-type-options']).toBe('nosniff');
     expect(res.headers['strict-transport-security']).toBeDefined();
     expect(res.headers['content-security-policy']).toBeDefined();
+  });
+
+  it('sends no CORS headers (browsers on other origins are not granted access)', async () => {
+    const res = await request(ctx.app).get('/health').set('Origin', 'https://evil.example');
+    expect(res.headers['access-control-allow-origin']).toBeUndefined();
+    const preflight = await request(ctx.app).options('/articles').set('Origin', 'https://evil.example').set('Access-Control-Request-Method', 'DELETE');
+    expect(preflight.headers['access-control-allow-origin']).toBeUndefined();
   });
 
   it('malformed JSON => 400 in the standard shape, no stack trace', async () => {

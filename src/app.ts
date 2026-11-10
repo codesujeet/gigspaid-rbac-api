@@ -32,6 +32,8 @@ export function createProtectedRouter(config: Config, store: Store): Router {
 export function createApp(config: Config, store: Store): Express {
   const app = express();
   app.disable('x-powered-by');
+  // Only trust X-Forwarded-For when explicitly told how many proxies sit in front (rate limiting keys on the client IP).
+  if (config.trustProxyHops > 0) app.set('trust proxy', config.trustProxyHops);
   app.use(helmet());
   app.use(express.json({ limit: '100kb' }));
 

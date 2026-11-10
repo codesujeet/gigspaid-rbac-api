@@ -20,6 +20,14 @@ export interface Article {
   updatedAt: string;
 }
 
+/** Thrown when an operation would leave the system without any admin. */
+export class LastAdminError extends Error {
+  constructor() {
+    super('Cannot remove the last remaining admin');
+    this.name = 'LastAdminError';
+  }
+}
+
 export const toPublicUser = ({ passwordHash: _omit, ...rest }: User): PublicUser => rest;
 
 /**
@@ -52,13 +60,19 @@ export class Store {
   countAdmins(): number {
     return this.listUsers().filter((u) => u.role === 'admin').length;
   }
+  /** Throws LastAdminError instead of demoting the only admin. Check and write happen in one synchronous step. */
   setUserRole(id: string, role: Role): User | undefined {
     const u = this.users.get(id);
     if (!u) return undefined;
+    if (u.role === 'admin' && role !== 'admin' && this.countAdmins() <= 1) throw new LastAdminError();
     u.role = role;
     return u;
   }
+  /** Throws LastAdminError instead of deleting the only admin. */
   deleteUser(id: string): boolean {
+    const u = this.users.get(id);
+    if (!u) return false;
+    if (u.role === 'admin' && this.countAdmins() <= 1) throw new LastAdminError();
     return this.users.delete(id);
   }
 

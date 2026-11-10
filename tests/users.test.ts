@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { beforeEach, describe, expect, it } from 'vitest';
+import { LastAdminError } from '../src/store';
 import { bearer, buildCtx, type Ctx } from './helpers';
 
 describe('privilege escalation attempts', () => {
@@ -111,6 +112,24 @@ describe('last-admin protection', () => {
     expect(last.status).toBe(409);
     const lastDemote = await request(ctx.app).patch(`/users/${ctx.user.editor.id}/role`).set(bearer(second.body.token)).send({ role: 'editor' });
     expect(lastDemote.status).toBe(409);
+  });
+
+  it('the last-admin rule lives in the store, not only in the route (cannot be bypassed)', () => {
+    expect(() => ctx.store.setUserRole(ctx.user.admin.id, 'editor')).toThrow(LastAdminError);
+    expect(() => ctx.store.deleteUser(ctx.user.admin.id)).toThrow(LastAdminError);
+    expect(ctx.store.countAdmins()).toBe(1);
+  });
+
+  it('concurrent demote/delete requests for two admins can never leave zero admins', async () => {
+    ctx.store.setUserRole(ctx.user.editor.id, 'admin');
+    const second = await request(ctx.app).post('/auth/login').send({ email: 'editor@example.com', password: 'Editor#12345' });
+    const results = await Promise.all([
+      request(ctx.app).patch(`/users/${ctx.user.editor.id}/role`).set(bearer(ctx.token.admin)).send({ role: 'viewer' }),
+      request(ctx.app).delete(`/users/${ctx.user.admin.id}`).set(bearer(second.body.token)),
+    ]);
+    expect(ctx.store.countAdmins()).toBe(1);
+    // Exactly one request wins; the other is refused (409, or 401 if its caller was already demoted).
+    expect(results.filter((r) => r.status < 300)).toHaveLength(1);
   });
 
   it('GET /users never leaks password hashes', async () => {
