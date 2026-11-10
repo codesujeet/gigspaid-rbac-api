@@ -1,5 +1,7 @@
 # gigspaid-rbac-api
 
+[![CI](https://github.com/codesujeet/gigspaid-rbac-api/actions/workflows/ci.yml/badge.svg)](https://github.com/codesujeet/gigspaid-rbac-api/actions/workflows/ci.yml)
+
 A small, security-focused REST API with **admin**, **editor** and **viewer** roles, built with Node 22, TypeScript (strict), Express, JWT and zod. Authorization is a single declarative permission map enforced by middleware on every protected route, and the test suite proves that every forbidden action returns **403**.
 
 > Storage is **in-memory** (see [Known limitations](#known-limitations)). This is a reference implementation of the access-control layer, not a production datastore.
